@@ -1012,4 +1012,9 @@ body {
   .input-box-wrap {
     border-radius: 16px !important;
   }
+
+  .floating-btn-mobile {
+    bottom: 110px !important;
+    right: 16px !important;
+  }
 }
