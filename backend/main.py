@@ -96,16 +96,21 @@ async def websocket_endpoint(websocket: WebSocket):
                     user_text  = payload.get("text", "")
                     attachments = payload.get("attachments", [])
                     web_search  = payload.get("webSearch", True)  # default ON
+                    client_history = payload.get("history", None)
                 except json.JSONDecodeError:
                     user_text  = data
                     attachments = []
                     web_search  = True
+                    client_history = None
 
                 # Save user message
                 await save_chat_message(session_id, "user", user_text)
 
                 # Get chat history for context
-                history = await get_chat_history(session_id, limit=6)
+                if client_history is not None:
+                    history = client_history
+                else:
+                    history = await get_chat_history(session_id, limit=6)
 
                 # ── If web search enabled: fetch structured results first ──
                 search_results = []
