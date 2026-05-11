@@ -139,21 +139,29 @@ function Sidebar({ isOpen, toggleSidebar, conversations, activeId, onSelect, onN
 
   /* Collapsed state → show icon rail */
   if (!isOpen) {
-    return <CollapsedRail onOpen={toggleSidebar} conversations={conversations} activeId={activeId} onSelect={onSelect} onNewChat={onNewChat} />;
+    return <div className="hidden md:block"><CollapsedRail onOpen={toggleSidebar} conversations={conversations} activeId={activeId} onSelect={onSelect} onNewChat={onNewChat} /></div>;
   }
 
   return (
-    <div
-      style={{
-        width: '268px', minWidth: '268px',
-        height: '100vh', display: 'flex', flexDirection: 'column',
-        background: '#212121',
-        borderRight: '1px solid rgba(255,255,255,0.04)',
-        flexShrink: 0, zIndex: 40, position: 'relative',
-        transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
-      }}
-    >
-      {/* Subtle top glow */}
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          className="md:hidden sidebar-backdrop" 
+          onClick={toggleSidebar}
+        />
+      )}
+      <div
+        className={`sidebar-mobile-overlay z-50 shadow-2xl md:shadow-none ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:relative'}`}
+        style={{
+          width: '280px', minWidth: '280px',
+          height: '100vh', display: 'flex', flexDirection: 'column',
+          background: '#1a1a1a',
+          borderRight: '1px solid rgba(255,255,255,0.04)',
+          flexShrink: 0,
+          transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
+        }}
+      >
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: '120px',
         background: 'radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.08) 0%, transparent 70%)',
@@ -288,27 +296,42 @@ function Sidebar({ isOpen, toggleSidebar, conversations, activeId, onSelect, onN
       <div style={{
         padding: '12px', borderTop: '1px solid rgba(255,255,255,0.04)', flexShrink: 0,
       }}>
-        <button
-          style={{
-            display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
-            padding: '10px 12px', borderRadius: '12px', border: 'none',
-            background: 'transparent', cursor: 'pointer', transition: 'background 0.15s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          <div style={{
-            width: '30px', height: '30px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, #374151, #1f2937)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <Settings style={{ width: '14px', height: '14px', color: '#9ca3af' }} />
-          </div>
-          <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 500 }}>Settings</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', flex: 1,
+              padding: '10px 12px', borderRadius: '12px', border: 'none',
+              background: 'transparent', cursor: 'pointer', transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <div style={{
+              width: '30px', height: '30px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #374151, #1f2937)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Settings style={{ width: '14px', height: '14px', color: '#9ca3af' }} />
+            </div>
+            <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 500 }}>Settings</span>
+          </button>
+          
+          <button
+            className="md:hidden"
+            onClick={toggleSidebar}
+            style={{
+              width: '50px', height: '50px', borderRadius: '12px', border: 'none',
+              background: 'rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', color: '#9ca3af',
+            }}
+          >
+            <PanelLeftClose style={{ width: '18px', height: '18px' }} />
+          </button>
+        </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -796,7 +819,7 @@ export default function ChatInterface() {
       <div className="flex-1 flex flex-col relative min-w-0 transition-all duration-300">
 
         {/* ── NAV ── */}
-        <header style={{
+        <header className="chat-header-mobile" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 16px', height: '54px', flexShrink: 0,
           borderBottom: '1px solid rgba(255,255,255,0.04)',
@@ -853,8 +876,8 @@ export default function ChatInterface() {
       {/* ── SCROLL AREA ── */}
       <div
         ref={scrollAreaRef}
-        className="flex-1 overflow-y-auto"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.07) transparent' }}
+        className="flex-1 overflow-y-auto custom-scrollbar chat-messages-mobile"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.07) transparent', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative', zIndex: 20 }}
       >
         {(!hasMessages && !activeId) ? (
           /* ── NEW CHAT WELCOME SCREEN ── */
@@ -1048,7 +1071,7 @@ export default function ChatInterface() {
                 <div style={{ display: 'flex', width: '100%', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 {msg.role === 'user' ? (
                   /* User bubble */
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', maxWidth: '78%' }} className="msg-group">
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', maxWidth: '78%' }} className="msg-group message-content-mobile">
                     <style>{`
                       @keyframes bubbleIn {
                         from { opacity: 0; transform: translateY(8px) scale(0.97); }
