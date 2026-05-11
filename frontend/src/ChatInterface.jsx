@@ -606,7 +606,7 @@ export default function ChatInterface() {
   const [socket, setSocket] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isSearching, setIsSearching] = useState(false); // web search in progress
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const messagesEndRef = useRef(null);
   const scrollAreaRef = useRef(null);
   const navigate = useNavigate();
