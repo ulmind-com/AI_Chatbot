@@ -6,7 +6,8 @@ import uuid
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from database import save_chat_message, get_chat_history, get_all_knowledge, add_knowledge, delete_knowledge
-from openai_service import get_ai_response
+from openai_service import get_ai_response, get_ai_response_stream, get_search_results_structured
+from agent_router import agent_router
 
 load_dotenv()
 
@@ -20,6 +21,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(agent_router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -82,28 +85,55 @@ async def remove_knowledge(kb_id: str, authorized: bool = Depends(verify_token))
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    session_id = str(uuid.uuid4()) # Generate a new session for this connection
+    session_id = str(uuid.uuid4())
     try:
         while True:
             data = await websocket.receive_text()
             try:
+                import json
+                try:
+                    payload = json.loads(data)
+                    user_text  = payload.get("text", "")
+                    attachments = payload.get("attachments", [])
+                    web_search  = payload.get("webSearch", True)  # default ON
+                except json.JSONDecodeError:
+                    user_text  = data
+                    attachments = []
+                    web_search  = True
+
                 # Save user message
-                await save_chat_message(session_id, "user", data)
-                
+                await save_chat_message(session_id, "user", user_text)
+
                 # Get chat history for context
-                history = await get_chat_history(session_id, limit=5)
-                
-                # Get AI response
-                bot_response = await get_ai_response(data, history)
-                
-                # Save bot response
-                await save_chat_message(session_id, "assistant", bot_response)
-                
-                # Send back to client
-                await websocket.send_text(bot_response)
+                history = await get_chat_history(session_id, limit=6)
+
+                # ── If web search enabled: fetch structured results first ──
+                search_results = []
+                if web_search and user_text.strip():
+                    search_results = await get_search_results_structured(user_text)
+                    if search_results:
+                        await websocket.send_text(f"SEARCH_RESULTS:{json.dumps(search_results)}")
+
+                # ── STREAMING AI response (pass prefetched results to avoid double search) ──
+                full_response = ""
+                async for chunk in get_ai_response_stream(
+                    user_text, history, attachments,
+                    web_search=web_search,
+                    prefetched_results=search_results if search_results else None
+                ):
+                    full_response += chunk
+                    await websocket.send_text(f"CHUNK:{chunk}")
+
+                await websocket.send_text("DONE")
+
+                if full_response.strip():
+                    await save_chat_message(session_id, "assistant", full_response)
+
             except Exception as e:
                 print(f"Error handling message: {e}")
-                await websocket.send_text("I'm sorry, my database connection timed out. Please check your internet connection or try again.")
-            
+                await websocket.send_text("CHUNK:⚠️ Something went wrong. Please try again.")
+                await websocket.send_text("DONE")
+
     except WebSocketDisconnect:
-        print(f"Client disconnected for session: {session_id}")
+        print(f"Client disconnected: {session_id}")
+
