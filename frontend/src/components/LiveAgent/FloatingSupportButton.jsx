@@ -23,7 +23,7 @@ export default function FloatingSupportButton({ onClick, status, agentsOnline = 
     : 'Live Support';
 
   return (
-    <div style={{
+    <div className="floating-btn-mobile" style={{
       position:'fixed', bottom:'24px', right:'24px', zIndex:7999,
       display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'8px',
       fontFamily:"'Inter','Outfit',sans-serif",

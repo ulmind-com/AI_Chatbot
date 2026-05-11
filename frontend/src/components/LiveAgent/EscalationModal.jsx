@@ -64,6 +64,23 @@ export default function EscalationModal({ isOpen, onConfirm, onDismiss, triggerR
           padding: '28px 28px 24px',
           position: 'relative',
         }}>
+          {/* Close Icon */}
+          <button 
+            onClick={onDismiss}
+            style={{
+              position: 'absolute', top: '16px', right: '16px',
+              width: '32px', height: '32px', borderRadius: '50%', border: 'none',
+              background: 'rgba(255,255,255,0.05)', color: '#9ca3af',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', zIndex: 10, transition: 'all 0.2s',
+              fontSize: '18px', lineHeight: 1
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#9ca3af'; }}
+          >
+            ✕
+          </button>
+
           {/* Animated orbs */}
           <div style={{ position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px',
             borderRadius:'50%', background:'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',

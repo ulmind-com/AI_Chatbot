@@ -1003,6 +1003,7 @@ body {
   
   .chat-messages-mobile {
     padding: 16px !important;
+    padding-bottom: 280px !important;
   }
 
   .message-content-mobile {
@@ -1012,4 +1013,48 @@ body {
   .input-box-wrap {
     border-radius: 16px !important;
   }
+
+  .floating-btn-mobile {
+    bottom: 24px !important;
+    right: 16px !important;
+  }
+  
+  .chat-input-container-mobile {
+    padding-bottom: 160px !important;
+  }
 }
+
+/* Suggestion Pills */
+.suggestion-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 100%;
+}
+.suggestion-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(139, 92, 246, 0.3);
+  transform: translateY(-2px);
+}
+.suggestion-pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.suggestion-pill-text {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #e5e7eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+

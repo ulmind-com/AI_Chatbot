@@ -791,9 +791,12 @@ export default function ChatInterface() {
 
     setIsTyping(true);
     if (webSearch) setIsSearching(true);
-    const payload = JSON.stringify({ text: text.trim(), attachments, webSearch });
+    
+    // Pass previous messages as history to the backend for context memory
+    const historyPayload = messages.map(m => ({ role: m.role, content: m.content })).slice(-10);
+    const payload = JSON.stringify({ text: text.trim(), attachments, webSearch, history: historyPayload });
     ws.send(payload);
-  }, []);
+  }, [messages]);
 
   const suggestions = [
     { icon: <Terminal className="w-5 h-5 text-violet-400" />, label: 'Write a Python script', sub: 'to automate daily emails' },
@@ -981,66 +984,30 @@ export default function ChatInterface() {
                 Ask anything — ULMIND AI searches the web and answers instantly.
               </p>
 
-              {/* ── Suggestion Cards ── */}
+              {/* ── Suggestion Pills ── */}
               <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr',
-                gap: '12px', width: '100%',
+                display: 'flex', flexWrap: 'wrap', justifyContent: 'center',
+                gap: '10px', width: '100%', maxWidth: '600px'
               }}>
                 {suggestions.map((s, i) => {
                   const colors = [
-                    { bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)', icon: '#a78bfa', glow: 'rgba(139,92,246,0.15)' },
-                    { bg: 'rgba(56,189,248,0.1)', border: 'rgba(56,189,248,0.2)', icon: '#38bdf8', glow: 'rgba(56,189,248,0.12)' },
-                    { bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)', icon: '#34d399', glow: 'rgba(52,211,153,0.12)' },
-                    { bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.18)', icon: '#fbbf24', glow: 'rgba(251,191,36,0.1)' },
+                    { icon: '#a78bfa' },
+                    { icon: '#38bdf8' },
+                    { icon: '#34d399' },
+                    { icon: '#fbbf24' },
                   ][i];
                   return (
                     <button
                       key={i}
-                      className="suggestion-card"
+                      className="suggestion-pill"
                       onClick={() => sendMessage(`${s.label} — ${s.sub}`)}
-                      style={{
-                        display: 'flex', flexDirection: 'column', gap: '10px',
-                        padding: '18px', borderRadius: '18px', textAlign: 'left',
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
-                        backdropFilter: 'blur(12px)',
-                        WebkitBackdropFilter: 'blur(12px)',
-                        position: 'relative', overflow: 'hidden',
-                      }}
                     >
-                      {/* Card inner glow on color */}
-                      <div style={{
-                        position: 'absolute', top: '-20px', right: '-20px',
-                        width: '80px', height: '80px', borderRadius: '50%',
-                        background: colors.glow, filter: 'blur(20px)',
-                        pointerEvents: 'none',
-                      }} />
-
-                      {/* Icon badge */}
-                      <div style={{
-                        width: '36px', height: '36px', borderRadius: '10px',
-                        background: colors.bg,
-                        border: `1px solid ${colors.border}`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        <span style={{ color: colors.icon, display: 'flex', alignItems: 'center' }}>{s.icon}</span>
-                      </div>
-
-                      <div>
-                        <div style={{
-                          fontSize: '13.5px', fontWeight: 600, color: '#e5e7eb',
-                          marginBottom: '3px', letterSpacing: '-0.01em',
-                        }}>
-                          {s.label}
-                        </div>
-                        <div style={{
-                          fontSize: '12px', color: '#6b7280', lineHeight: 1.5,
-                        }}>
-                          {s.sub}
-                        </div>
-                      </div>
+                      <span className="suggestion-pill-icon" style={{ color: colors.icon }}>
+                        {React.cloneElement(s.icon, { style: { width: '16px', height: '16px' }})}
+                      </span>
+                      <span className="suggestion-pill-text">
+                        {s.label}
+                      </span>
                     </button>
                   );
                 })}
@@ -1282,6 +1249,7 @@ export default function ChatInterface() {
 
       {/* ── INPUT — floating premium panel ── */}
       <div
+        className="chat-input-container-mobile"
         style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
           zIndex: 50, pointerEvents: 'none',
