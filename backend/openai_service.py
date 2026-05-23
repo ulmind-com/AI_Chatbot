@@ -6,6 +6,9 @@ import io
 import PyPDF2
 from dotenv import load_dotenv
 from database import get_all_knowledge
+import httpx
+import re
+import urllib.parse
 from ddgs import DDGS
 import asyncio
 
@@ -66,6 +69,62 @@ async def get_search_results_structured(query: str) -> list:
         return []
 
 
+async def fetch_weather_report(query: str) -> str:
+    try:
+        lower_q = query.lower()
+        weather_keywords = ['weather', 'temperature', 'temp', 'abohawa', 'tapmatra', 'forecast', 'climate', 'celsius']
+        if not any(k in lower_q for k in weather_keywords):
+            return ""
+
+        extract_msg = [{"role": "user", "content": f"Extract ONLY the city or location name from this query. If no specific location is mentioned, reply with NONE. Do not add any punctuation or extra words. Query: '{query}'"}]
+        
+        city = ""
+        for model in MODELS:
+            try:
+                resp = await client.chat.completions.create(
+                    model=model,
+                    messages=extract_msg,
+                    max_tokens=15,
+                    temperature=0.1
+                )
+                city = resp.choices[0].message.content.strip()
+                if city:
+                    break
+            except:
+                continue
+                
+        if not city or city.upper() == "NONE" or len(city) > 30:
+            return ""
+            
+        city = re.sub(r'[^\w\s-]', '', city).strip()
+        if not city:
+            return ""
+            
+        async with httpx.AsyncClient(timeout=4.0) as http_client:
+            resp = await http_client.get(f"https://wttr.in/{urllib.parse.quote(city)}?format=j1")
+            if resp.status_code == 200:
+                data = resp.json()
+                cc = data['current_condition'][0]
+                area = data['nearest_area'][0]
+                loc_name = area['areaName'][0]['value']
+                country = area['country'][0]['value']
+                
+                weather_info = (
+                    f"REAL-TIME WEATHER FOR {loc_name}, {country}:\n"
+                    f"- Current Temperature: {cc['temp_C']}°C (Feels like {cc['FeelsLikeC']}°C)\n"
+                    f"- Condition: {cc['weatherDesc'][0]['value']}\n"
+                    f"- Humidity: {cc['humidity']}%\n"
+                    f"- Wind Speed: {cc['windspeedKmph']} km/h\n"
+                    f"- Cloud Cover: {cc['cloudcover']}%\n"
+                    f"- Precipitation: {cc['precipMM']} mm\n"
+                    f"- UV Index: {cc['uvIndex']}"
+                )
+                return weather_info
+    except Exception as e:
+        print(f"Weather fetch failed: {e}")
+    return ""
+
+
 async def build_messages(user_message: str, chat_history: list = None, attachments: list = None,
                          web_search: bool = True, prefetched_results: list = None):
     # Process PDF attachments
@@ -87,16 +146,23 @@ async def build_messages(user_message: str, chat_history: list = None, attachmen
         user_message += f"\n\n[EXTRACTED PDF DOCUMENT TEXT]:\n{pdf_text}\n(Please analyze the above document if the user asks about it.)"
 
     # Fetch knowledge base. Use prefetched results if available (avoids double search).
+    weather_task = fetch_weather_report(user_message) if web_search else None
     kb_task = get_all_knowledge()
+    
     if prefetched_results:
         kb_items = await kb_task
         web_results = json.dumps(prefetched_results)
+        weather_data = await weather_task if weather_task else ""
     elif web_search:
         web_task = search_web(user_message)
-        kb_items, web_results = await asyncio.gather(kb_task, web_task)
+        kb_items, web_results, weather_data = await asyncio.gather(kb_task, web_task, weather_task)
     else:
         kb_items = await kb_task
         web_results = ""
+        weather_data = ""
+
+    if weather_data:
+        web_results = weather_data + "\n\n" + web_results
 
     kb_context = ""
     if kb_items:
