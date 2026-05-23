@@ -131,7 +131,7 @@ function CollapsedRail({ onOpen, conversations, activeId, onSelect, onNewChat })
 }
 
 /* ─────────────────────────── Sidebar ─────────────────────────── */
-function Sidebar({ isOpen, toggleSidebar, conversations, activeId, onSelect, onNewChat }) {
+function Sidebar({ isOpen, toggleSidebar, conversations, activeId, onSelect, onNewChat, onDelete }) {
   const [searchVal, setSearchVal] = useState('');
 
   const groups = ['Today', 'Yesterday', 'Older'];
@@ -281,9 +281,14 @@ function Sidebar({ isOpen, toggleSidebar, conversations, activeId, onSelect, onN
                       background: 'rgba(255,255,255,0.08)', display: 'flex',
                       alignItems: 'center', justifyContent: 'center',
                     }}
-                    onClick={e => e.stopPropagation()}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (onDelete && window.confirm('Are you sure you want to delete this conversation permanently?')) {
+                        onDelete(chat.id);
+                      }
+                    }}
                   >
-                    <MoreHorizontal style={{ width: '13px', height: '13px', color: '#9ca3af' }} />
+                    <Trash2 style={{ width: '13px', height: '13px', color: '#f87171' }} />
                   </div>
                 </div>
               ))}
@@ -600,9 +605,44 @@ function getDateLabel(ts) {
 /* ─────────────────────────── Main Component ─────────────────────────── */
 export default function ChatInterface() {
   // Multi-conversation state
-  const [conversations, setConversations] = useState([]); // { id, title, messages, createdAt }
-  const [activeId, setActiveId] = useState(null);         // currently open conversation id
-  const [messages, setMessages] = useState([]);           // current chat messages
+  const [conversations, setConversations] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ulmind_conversations');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  }); // { id, title, messages, createdAt }
+  
+  const [activeId, setActiveId] = useState(() => {
+    return localStorage.getItem('ulmind_activeId') || null;
+  }); // currently open conversation id
+  
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ulmind_messages');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  }); // current chat messages
+
+  // Persist state to localStorage
+  useEffect(() => {
+    localStorage.setItem('ulmind_conversations', JSON.stringify(conversations));
+  }, [conversations]);
+
+  useEffect(() => {
+    if (activeId) {
+      localStorage.setItem('ulmind_activeId', activeId);
+    } else {
+      localStorage.removeItem('ulmind_activeId');
+    }
+  }, [activeId]);
+
+  useEffect(() => {
+    localStorage.setItem('ulmind_messages', JSON.stringify(messages));
+  }, [messages]);
   const [socket, setSocket] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isSearching, setIsSearching] = useState(false); // web search in progress
@@ -817,6 +857,14 @@ export default function ChatInterface() {
         activeId={activeId}
         onSelect={handleSelectConversation}
         onNewChat={handleNewChat}
+        onDelete={(id) => {
+          setConversations(prev => prev.filter(c => c.id !== id));
+          if (activeId === id) {
+            setActiveId(null);
+            setMessages([]);
+            setIsTyping(false);
+          }
+        }}
       />
 
       <div className="flex-1 flex flex-col relative min-w-0 transition-all duration-300">
