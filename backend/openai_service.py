@@ -101,27 +101,90 @@ async def fetch_weather_report(query: str) -> str:
             return ""
             
         async with httpx.AsyncClient(timeout=4.0) as http_client:
-            resp = await http_client.get(f"https://wttr.in/{urllib.parse.quote(city)}?format=j1")
-            if resp.status_code == 200:
-                data = resp.json()
-                cc = data['current_condition'][0]
-                area = data['nearest_area'][0]
-                loc_name = area['areaName'][0]['value']
-                country = area['country'][0]['value']
+            owm_key = os.getenv("OPENWEATHER_API_KEY")
+            wapi_key = os.getenv("WEATHERAPI_KEY")
+            tmrw_key = os.getenv("TOMORROW_IO_KEY")
+            
+            weather_info = ""
+            
+            # 1. Try WeatherAPI (Most detailed real-time data)
+            if wapi_key and not weather_info:
+                try:
+                    resp = await http_client.get(f"https://api.weatherapi.com/v1/current.json?key={wapi_key}&q={urllib.parse.quote(city)}&aqi=no")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        loc = data['location']['name']
+                        country = data['location']['country']
+                        curr = data['current']
+                        weather_info = (
+                            f"REAL-TIME WEATHER FOR {loc}, {country} (via WeatherAPI):\n"
+                            f"- Temperature: {curr['temp_c']}°C (Feels like {curr['feelslike_c']}°C)\n"
+                            f"- Condition: {curr['condition']['text']}\n"
+                            f"- Humidity: {curr['humidity']}%\n"
+                            f"- Wind: {curr['wind_kph']} km/h\n"
+                            f"- UV Index: {curr['uv']}"
+                        )
+                except Exception as e: print(f"WeatherAPI failed: {e}")
+
+            # 2. Try OpenWeatherMap
+            if owm_key and not weather_info:
+                try:
+                    resp = await http_client.get(f"https://api.openweathermap.org/data/2.5/weather?q={urllib.parse.quote(city)}&appid={owm_key}&units=metric")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        loc = data['name']
+                        country = data['sys']['country']
+                        weather_info = (
+                            f"REAL-TIME WEATHER FOR {loc}, {country} (via OpenWeatherMap):\n"
+                            f"- Temperature: {data['main']['temp']}°C (Feels like {data['main']['feels_like']}°C)\n"
+                            f"- Condition: {data['weather'][0]['description'].capitalize()}\n"
+                            f"- Humidity: {data['main']['humidity']}%\n"
+                            f"- Wind: {data['wind']['speed']} m/s\n"
+                        )
+                except Exception as e: print(f"OWM failed: {e}")
+
+            # 3. Try Tomorrow.io
+            if tmrw_key and not weather_info:
+                try:
+                    resp = await http_client.get(f"https://api.tomorrow.io/v4/weather/realtime?location={urllib.parse.quote(city)}&apikey={tmrw_key}")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        loc = data['location']['name']
+                        vals = data['data']['values']
+                        weather_info = (
+                            f"REAL-TIME WEATHER FOR {loc} (via Tomorrow.io):\n"
+                            f"- Temperature: {vals['temperature']}°C (Apparent: {vals['temperatureApparent']}°C)\n"
+                            f"- Humidity: {vals['humidity']}%\n"
+                            f"- Wind Speed: {vals['windSpeed']} m/s\n"
+                            f"- Cloud Cover: {vals['cloudCover']}%\n"
+                        )
+                except Exception as e: print(f"Tomorrow.io failed: {e}")
                 
-                weather_info = (
-                    f"REAL-TIME WEATHER FOR {loc_name}, {country}:\n"
-                    f"- Current Temperature: {cc['temp_C']}°C (Feels like {cc['FeelsLikeC']}°C)\n"
-                    f"- Condition: {cc['weatherDesc'][0]['value']}\n"
-                    f"- Humidity: {cc['humidity']}%\n"
-                    f"- Wind Speed: {cc['windspeedKmph']} km/h\n"
-                    f"- Cloud Cover: {cc['cloudcover']}%\n"
-                    f"- Precipitation: {cc['precipMM']} mm\n"
-                    f"- UV Index: {cc['uvIndex']}"
-                )
-                return weather_info
+            # 4. Fallback to wttr.in if no API keys provided or all failed
+            if not weather_info:
+                try:
+                    resp = await http_client.get(f"https://wttr.in/{urllib.parse.quote(city)}?format=j1")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        cc = data['current_condition'][0]
+                        area = data['nearest_area'][0]
+                        loc_name = area['areaName'][0]['value']
+                        country = area['country'][0]['value']
+                        weather_info = (
+                            f"REAL-TIME WEATHER FOR {loc_name}, {country} (via wttr.in):\n"
+                            f"- Current Temperature: {cc['temp_C']}°C (Feels like {cc['FeelsLikeC']}°C)\n"
+                            f"- Condition: {cc['weatherDesc'][0]['value']}\n"
+                            f"- Humidity: {cc['humidity']}%\n"
+                            f"- Wind Speed: {cc['windspeedKmph']} km/h\n"
+                            f"- Cloud Cover: {cc['cloudcover']}%\n"
+                            f"- Precipitation: {cc['precipMM']} mm\n"
+                            f"- UV Index: {cc['uvIndex']}"
+                        )
+                except Exception as e: print(f"wttr.in fallback failed: {e}")
+
+            return weather_info
     except Exception as e:
-        print(f"Weather fetch failed: {e}")
+        print(f"Weather fetch failed entirely: {e}")
     return ""
 
 
@@ -186,6 +249,7 @@ CRITICAL INSTRUCTIONS:
 3. REAL-TIME DATA: If the user asks about current events, weather, business, finance, or real-time information, use the REAL-TIME WEB SEARCH RESULTS provided below to answer accurately.
 4. Be direct, fast, and highly accurate.
 5. Format your output in beautiful Markdown (bold, lists, code blocks with syntax highlighting).
+6. DO NOT output any <tool_call> tags or attempt to invoke tools. The real-time data is ALREADY provided to you in the context below. Answer directly based on the context.
 
 {kb_context}
 {web_context}
