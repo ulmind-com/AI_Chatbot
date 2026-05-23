@@ -21,14 +21,7 @@ client = AsyncOpenAI(
 # Verified available free models (fetched from OpenRouter API)
 # Diverse providers: Google, NVIDIA, OpenAI OSS, Qwen, Venice
 MODELS = [
-    "google/gemma-4-26b-a4b-it:free",              # Google — latest Gemma 4
-    "nvidia/nemotron-nano-9b-v2:free",              # NVIDIA — fast small model
-    "openai/gpt-oss-20b:free",                      # OpenAI OSS — reliable
-    "nvidia/nemotron-3-super-120b-a12b:free",       # NVIDIA — large/smart
-    "meta-llama/llama-3.3-70b-instruct:free",       # Venice — high quality
-    "meta-llama/llama-3.2-3b-instruct:free",        # Venice — fast fallback
-    "nousresearch/hermes-3-llama-3.1-405b:free",    # Venice — large fallback
-    "qwen/qwen3-coder:free",                        # Venice — coding
+    "openrouter/free",  # Auto-routes to the fastest available free model
 ]
 
 
@@ -159,48 +152,30 @@ CRITICAL INSTRUCTIONS:
 
 
 async def _try_models_stream(messages):
-    """Try each model; skip immediately on 429/402. Smart retry once if ALL providers fail."""
-    RETRY_WAIT = 16  # seconds — matches Venice rate limit window
+    """Try each model; skip immediately on 429/402. Return immediately on success."""
+    for model in MODELS:
+        try:
+            print(f"[ULMIND AI Stream] Trying model: {model}")
+            stream = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=1500,
+                temperature=0.3,
+                stream=True,
+            )
+            full_response = ""
+            async for chunk in stream:
+                delta = chunk.choices[0].delta.content or ""
+                if delta:
+                    full_response += delta
+                    yield delta
+            if full_response.strip():
+                return  # ✅ Success
+        except Exception as e:
+            print(f"[ULMIND AI Stream] {model} → error: {e}")
+            continue
 
-    for attempt in range(2):
-        all_rate_limited = True
-        for model in MODELS:
-            try:
-                print(f"[ULMIND AI Stream] Trying model: {model}")
-                stream = await client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=1500,
-                    temperature=0.3,
-                    stream=True,
-                )
-                full_response = ""
-                async for chunk in stream:
-                    delta = chunk.choices[0].delta.content or ""
-                    if delta:
-                        full_response += delta
-                        yield delta
-                if full_response.strip():
-                    return  # ✅ Success
-                all_rate_limited = False
-            except Exception as e:
-                err_str = str(e)
-                is_rate = '429' in err_str or '402' in err_str
-                if is_rate:
-                    print(f"[ULMIND AI Stream] {model} → rate limited, skipping...")
-                    continue
-                all_rate_limited = False
-                print(f"[ULMIND AI Stream] {model} → error: {e}")
-                continue
-
-        if all_rate_limited and attempt == 0:
-            print(f"[ULMIND AI Stream] All providers rate-limited. Waiting {RETRY_WAIT}s...")
-            yield f"\n\n⏳ *AI providers are briefly busy — retrying in {RETRY_WAIT}s...*\n\n"
-            await asyncio.sleep(RETRY_WAIT)
-        else:
-            break
-
-    yield "⚠️ All AI providers are temporarily busy. Please send your message again in a moment."
+    yield "⚠️ Free AI providers limit reached. Please wait or update API key."
 
 
 async def get_ai_response_stream(user_message: str, chat_history: list = None, attachments: list = None,
